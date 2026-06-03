@@ -105,7 +105,8 @@ DATABASE_URL=postgresql://postgres:password@localhost:5432/ai_assistant
 1. Install PostgreSQL
 2. Create database:
 
-```
+```sql
+CREATE DATABASE ai_assistant;
 
 ## Screenshots
 
