@@ -8,7 +8,6 @@ interface InputProps {
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   selectedFile: File | null;
   setSelectedFile: React.Dispatch<React.SetStateAction<File | null>>;
-  uploading: boolean;
   newMessage: () => void;
   message: string;
   setMessage: React.Dispatch<React.SetStateAction<string>>;
@@ -21,7 +20,6 @@ const InputArea = ({
   fileInputRef,
   selectedFile,
   setSelectedFile,
-  uploading,
   newMessage,
   message,
   setMessage,
@@ -120,7 +118,7 @@ const InputArea = ({
                 hover:text-white
                 transition"
               onClick={() => fileInputRef.current?.click()}>
-              {uploading ? (
+              {loading && selectedFile ? (
                 <FaSpinner className="text-indigo-500 animate-spin" />
               ) : (
                 <MdOutlineUploadFile size={22} />

@@ -39,7 +39,7 @@ const Message = ({ msg }: MessageProps) => {
         )}
       </div>
 
-      <div className="max-w-[80%]">
+      <div className="max-w-[80%] min-w-0">
         <div
           className={`
           rounded-2xl
@@ -53,10 +53,19 @@ const Message = ({ msg }: MessageProps) => {
           }
         `}>
           <div
-            className={`prose prose-sm max-w-none dark:prose-invert ${
+            className={`prose prose-sm max-w-none overflow-hidden prose-pre:overflow-x-auto prose-code:break-all dark:prose-invert ${
               msg.role === "user" ? "text-right" : ""
             }`}>
-            <ReactMarkdown>{msg.text}</ReactMarkdown>
+            <ReactMarkdown
+              components={{
+                pre: ({ children }) => (
+                  <pre className="overflow-x-auto rounded-lg bg-slate-800 text-orange-500 p-4">
+                    {children}
+                  </pre>
+                ),
+              }}>
+              {msg.text}
+            </ReactMarkdown>
           </div>
         </div>
 

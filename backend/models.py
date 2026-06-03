@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Index, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import declarative_base
-from datetime import datetime
+from datetime import datetime, timezone
 
 Base = declarative_base()
 
@@ -13,13 +13,13 @@ class ChatSession(Base):
     )
 
     title = Column(
-        String,
+        String(255),
         nullable=False
     )
 
     created_at = Column(
-        DateTime,
-        default=datetime.utcnow
+        DateTime(timezone=True),
+        default=datetime.now(timezone.utc)
     )
 
 class ChatMessage(Base):
@@ -27,7 +27,7 @@ class ChatMessage(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
-    session_id = Column(String, ForeignKey("chat_sessions.id"), nullable=False)
+    session_id = Column(String, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False)
 
     role = Column(
         String,
@@ -40,6 +40,8 @@ class ChatMessage(Base):
     )
 
     created_at = Column(
-        DateTime,
-        default=datetime.utcnow
+        DateTime(timezone=True),
+        default=datetime.now(timezone.utc)
     )
+
+    __table_args__ = (Index("ix_chat_messages_session_id", "session_id"),)

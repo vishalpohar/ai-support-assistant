@@ -11,14 +11,9 @@ import ChatHeader from "./components/ChatHeader";
 import InputArea from "./components/InputArea";
 
 import { getSessions } from "./features/sessionSlice";
-import {
-  getMessages,
-  sendMessage,
-  updateMessages,
-  clearMessages,
-} from "./features/messageSlice";
+import { getMessages } from "./features/messageSlice";
 
-import type { ChatMessage } from "./types/message";
+import { useChat } from "./hooks/useChat";
 
 const App = () => {
   const dispatch = useAppDispatch();
@@ -27,17 +22,27 @@ const App = () => {
     (state) => state.message,
   );
 
-  const [message, setMessage] = useState<string>("");
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
-  const [uploading, setUploading] = useState<boolean>(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [currentSession, setCurrentSession] = useState<string | null>(null);
 
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const isLoading = messageStatus === "loading";
+  
+  const {
+    message,
+    setMessage,
+    selectedFile,
+    setSelectedFile,
+    currentSession,
+    inputRef,
+    loadSession,
+    clearChat,
+    newMessage,
+  } = useChat(isLoading);
+
 
   useEffect(() => {
     dispatch(getSessions());
@@ -45,7 +50,10 @@ const App = () => {
 
   useEffect(() => {
     if (sessions.length > 0 && messages.length === 0) {
-      dispatch(getMessages(sessions[0]!.id));
+      const firstSession = sessions.at(0);
+      if (firstSession) {
+        dispatch(getMessages(firstSession.id));
+      }
     }
   }, [dispatch, sessions, messages.length]);
 
@@ -62,11 +70,6 @@ const App = () => {
       toast.error(error);
     }
   }, [error]);
-
-  const loadSession = (sessionId: string) => {
-    setCurrentSession(sessionId);
-    dispatch(getMessages(sessionId));
-  };
 
   // Check scroll position
   const handleScroll = () => {
@@ -85,50 +88,6 @@ const App = () => {
         behavior: "smooth",
       });
     }
-  };
-
-  const newMessage = async () => {
-    if (!message.trim()) return;
-
-    let sessionId = currentSession;
-
-    if (!sessionId) {
-      sessionId = crypto.randomUUID();
-      setCurrentSession(sessionId);
-    }
-
-    const userMessage: ChatMessage = {
-      role: "user",
-      text: message || (selectedFile ? selectedFile.name : ""),
-      timestamp: new Date().toISOString(),
-    };
-
-    dispatch(updateMessages(userMessage));
-
-    try {
-      const response = await dispatch(
-        sendMessage({ sessionId, message, file: selectedFile }),
-      ).unwrap();
-
-      const botMessage: ChatMessage = {
-        role: "assistant",
-        text: response.reply,
-        timestamp: new Date().toISOString(),
-      };
-
-      dispatch(updateMessages(botMessage));
-      dispatch(getSessions());
-    } catch (error) {
-    } finally {
-      setSelectedFile(null);
-      setMessage("");
-      inputRef.current?.focus();
-    }
-  };
-
-  const clearChat = () => {
-    setCurrentSession(null);
-    dispatch(clearMessages());
   };
 
   return (
@@ -176,7 +135,7 @@ const App = () => {
             <Message key={index} msg={msg} />
           ))}
 
-          {messageStatus === "loading" && (
+          {isLoading && (
             <div className="flex gap-3">
               <div className="w-9 h-9 flex items-center justify-center rounded-full">
                 <HiOutlineSparkles size={26} className="text-gray-500" />
@@ -223,11 +182,10 @@ const App = () => {
           fileInputRef={fileInputRef}
           selectedFile={selectedFile}
           setSelectedFile={setSelectedFile}
-          uploading={uploading}
           newMessage={newMessage}
           message={message}
           setMessage={setMessage}
-          loading={messageStatus === "loading"}
+          loading={isLoading}
           isDarkMode={isDarkMode}
         />
       </div>

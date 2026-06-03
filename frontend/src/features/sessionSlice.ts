@@ -22,7 +22,7 @@ export const getSessions = createAsyncThunk<Session[], void, {rejectValue: strin
       return response.data;
     } catch (error: any) {
       return rejectWithValue(
-        error?.response?.data?.message || "Failed to fetch sessions",
+        error?.response?.data?.detail || "Failed to fetch sessions",
       );
     }
   },
@@ -43,7 +43,7 @@ const sessionSlice = createSlice({
       })
       .addCase(getSessions.rejected, (state, action) => {
         state.sessionStatus = "failed";
-        state.error = action.payload as string;
+        state.error = action.payload ?? null;
       });
   },
 });

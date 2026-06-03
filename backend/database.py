@@ -1,9 +1,11 @@
+from dotenv import load_dotenv
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = "postgresql://postgres:root@localhost:5432/ai_assistant"
+load_dotenv()
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(os.getenv("DATABASE_URL"))
 
 SessionLocal = sessionmaker(
     autocommit=False,

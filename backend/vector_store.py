@@ -10,35 +10,34 @@ collection = client.get_or_create_collection(name="documents")
 # Embedding model
 embedding_model = None
 
+MAX_DISTANCE = 1.2
+
+CHUNK_SIZE = 500  # words per chunk
+CHUNK_OVERLAP = 50  # words shared between consecutive chunks
+
+
 def get_embedding_model():
     global embedding_model
 
     if embedding_model is None:
         embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-    
+
     return embedding_model
 
 
-def add_document(doc_id, text, session_id):
+def add_document(doc_id: str, text: str, session_id: str) -> None:
     if not text.strip():
         return
-    
+
     embedding_model = get_embedding_model()
 
-    chunks = chunk_text(text, chunk_size=500)
+    chunks = chunk_text(text)
 
-    ids = []
-    embeddings = []
-    documents = []
-    metadatas = []
+    ids, embeddings, documents, metadatas = [], [], [], []
 
     for i, chunk in enumerate(chunks):
-        chunk_id = f"{doc_id}_{i}"
-
-        embedding = embedding_model.encode(chunk).tolist()
-
-        ids.append(chunk_id)
-        embeddings.append(embedding)
+        ids.append(f"{doc_id}_{i}")
+        embeddings.append(embedding_model.encode(chunk).tolist())
         documents.append(chunk)
         metadatas.append({"doc_id": doc_id, "session_id": session_id, "chunk_index": i})
 
@@ -46,46 +45,39 @@ def add_document(doc_id, text, session_id):
         ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas
     )
 
-MAX_DISTANCE = 1.2
 
-def search_document(query, session_id, doc_id=None):
-    embedding_model = get_embedding_model()
-    query_embedding = embedding_model.encode(query).tolist()
+def search_document(
+    query: str, session_id: str, doc_id: str = None, n_results: int = 5
+) -> list[str]:
+    try:
+        embedding_model = get_embedding_model()
+        query_embedding = embedding_model.encode(query).tolist()
 
-    if doc_id is not None:
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=5,
-            where={"$and": [{"session_id": session_id}, {"doc_id": doc_id}]},
-        )
-    else:
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=5,
-            where={"session_id": session_id},
+        where_filter = (
+            {"$and": [{"session_id": session_id}, {"doc_id": doc_id}]}
+            if doc_id
+            else {"session_id": session_id}
         )
 
-    if not results or "documents" not in results:
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=n_results,
+            where=where_filter,
+        )
+
+        if not results or "documents" not in results:
+            return []
+
+        return [
+            doc.strip()
+            for doc, dist in zip(results["documents"][0], results["distances"][0])
+            if doc and dist <= MAX_DISTANCE
+        ]
+    except Exception:
         return []
 
-    docs = results["documents"][0]
-    distances = results["distances"][0]
 
-    formatted_docs = []
-
-    for doc, dist in zip(docs, distances):
-        if not doc:
-            continue
-
-        if dist > MAX_DISTANCE:
-            continue
-
-        formatted_docs.append(doc.strip())
-
-    return formatted_docs
-
-
-def chunk_text(text, chunk_size=200, overlap=50):
+def chunk_text(text: str, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP) -> list[str]:
     """
     Splits text into word-based chunks.
     """

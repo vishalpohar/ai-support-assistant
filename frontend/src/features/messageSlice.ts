@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
+import axios from "axios";
 
 import api from "../api/axios";
 import type { ChatMessage } from "../types/message";
@@ -11,13 +12,13 @@ export interface MessageState {
 }
 
 interface SendMessagePayload {
-    sessionId: string;
-    message: string;
-    file?: File | null;
+  sessionId: string;
+  message: string;
+  file?: File | null;
 }
 
 interface SendMessageResponse {
-    reply: string;
+  reply: string;
 }
 
 const initialState: MessageState = {
@@ -40,14 +41,20 @@ export const getMessages = createAsyncThunk<
   try {
     const response = await api.get(`/messages/${sessionId}`);
     return response.data;
-  } catch (error: any) {
-    return rejectWithValue(
-      error?.response?.data?.message || "Failed to fetch messages",
-    );
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      return rejectWithValue(
+        error?.response?.data?.detail || "Failed to fetch messages",
+      );
+    }
   }
 });
 
-export const sendMessage = createAsyncThunk<SendMessageResponse, SendMessagePayload, { rejectValue: string }>(
+export const sendMessage = createAsyncThunk<
+  SendMessageResponse,
+  SendMessagePayload,
+  { rejectValue: string }
+>(
   "message/sendMessage",
   async (
     payload: { sessionId: string; message: string; file?: File | null },
@@ -66,10 +73,12 @@ export const sendMessage = createAsyncThunk<SendMessageResponse, SendMessagePayl
         },
       });
       return response.data;
-    } catch (error: any) {
-      return rejectWithValue(
-        error?.response?.data?.message || "Failed to send message",
-      );
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        return rejectWithValue(
+          error?.response?.data?.detail || "Failed to send message",
+        );
+      }
     }
   },
 );
@@ -105,7 +114,7 @@ const messageSlice = createSlice({
       })
       .addCase(getMessages.rejected, (state, action) => {
         state.messageStatus = "failed";
-        state.error = action.payload as string;
+        state.error = action.payload ?? null;
       })
       .addCase(sendMessage.pending, (state) => {
         state.messageStatus = "loading";
@@ -117,7 +126,7 @@ const messageSlice = createSlice({
       })
       .addCase(sendMessage.rejected, (state, action) => {
         state.messageStatus = "failed";
-        state.error = action.payload as string;
+        state.error = action.payload ?? null;
       });
   },
 });

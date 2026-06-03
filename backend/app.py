@@ -46,6 +46,9 @@ ALLOWED_EXTENSIONS = [".pdf"]
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 MAX_PAGES = 100
 
+CONVERSATION_HISTORY_LIMIT = 6
+
+SUMMARY_N_RESULTS = 10
 
 # Database Dependency
 def get_db():
@@ -58,6 +61,7 @@ def get_db():
         raise
     finally:
         db.close()
+
 
 SUMMARY_KEYWORDS = [
     "summary",
@@ -88,6 +92,7 @@ GENERAL_QUERY_PATTERNS = [
     r"^goodbye\b",
 ]
 
+
 def is_general_conversational_query(message: str) -> bool:
     lowered = message.lower().strip()
     return any(re.search(pattern, lowered) for pattern in GENERAL_QUERY_PATTERNS)
@@ -104,7 +109,7 @@ async def chat(
         user_message = message.strip()
 
         if not user_message:
-            raise HTTPException(status_code=400, error="Message is required")
+            raise HTTPException(status_code=400, detail="Message is required")
 
         # Create session if not exists
         session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
@@ -138,7 +143,7 @@ async def chat(
             ext = os.path.splitext(file.filename)[1].lower()
 
             if ext not in ALLOWED_EXTENSIONS:
-                raise HTTPException(status_code=400, error="Unsupported file type")
+                raise HTTPException(status_code=400, detail="Unsupported file type")
 
             os.makedirs("uploads", exist_ok=True)
 
@@ -149,7 +154,7 @@ async def chat(
 
             if len(content) > MAX_FILE_SIZE:
                 raise HTTPException(
-                    status_code=400, error="File size exceeds the 10 MB limit"
+                    status_code=400, detail="File size exceeds the 10 MB limit"
                 )
 
             with open(filepath, "wb") as f:
@@ -162,12 +167,12 @@ async def chat(
                         reader = PdfReader(filepath)
                     except Exception:
                         raise HTTPException(
-                            status_code=400, error="Invalid or corrupted PDF"
+                            status_code=400, detail="Invalid or corrupted PDF"
                         )
 
                     if len(reader.pages) > MAX_PAGES:
                         raise HTTPException(
-                            status_code=400, error="PDF exceeds page limit"
+                            status_code=400, detail="PDF exceeds page limit"
                         )
 
                     for page in reader.pages:
@@ -180,7 +185,7 @@ async def chat(
 
             if not file_text.strip():
                 raise HTTPException(
-                    status_code=400, error="Could not extract text from PDF"
+                    status_code=400, detail="Could not extract text from PDF"
                 )
 
             doc_id = str(uuid.uuid4())
@@ -190,8 +195,9 @@ async def chat(
         db.commit()
 
         new_file_just_uploaded = bool(file_text.strip())
-        skip_retrieval = (is_general_conversational_query(user_message) and not new_file_just_uploaded)
-
+        skip_retrieval = (
+            is_general_conversational_query(user_message) and not new_file_just_uploaded
+        )
 
         retrieval_query = f"""
         Conversation:
@@ -202,8 +208,7 @@ async def chat(
         """
 
         is_summary_request = any(
-            keyword in user_message.lower()
-            for keyword in SUMMARY_KEYWORDS
+            keyword in user_message.lower() for keyword in SUMMARY_KEYWORDS
         )
 
         retrieved_context = ""
@@ -213,18 +218,17 @@ async def chat(
                 retrieved_context = file_text[:6000]
 
             elif new_file_just_uploaded:
-                relevant_docs = search_document(
-                    retrieval_query,
-                    session_id,
-                    doc_id
-                )
+                relevant_docs = search_document(retrieval_query, session_id, doc_id)
                 retrieved_context = "\n\n".join(relevant_docs[:3])
 
-            else:
+            elif is_summary_request:
                 relevant_docs = search_document(
-                    retrieval_query,
-                    session_id
+                    retrieval_query, session_id, n_results=SUMMARY_N_RESULTS
                 )
+                retrieved_context = "\n\n".join(relevant_docs)
+
+            else:
+                relevant_docs = search_document(retrieval_query, session_id)
                 retrieved_context = "\n\n".join(relevant_docs[:3])
 
         context = retrieved_context or "No context available"
@@ -239,7 +243,7 @@ async def chat(
                 conversation you may reference them when directly relevant, but do not
                 force document content into unrelated answers.
                 """
-        
+
         else:
             system_instruction = """
             You are an AI support assistant.
@@ -288,14 +292,11 @@ async def chat(
 
     except HTTPException:
         raise
-    
+
     except Exception:
         traceback.print_exc()
-    
-        raise HTTPException(
-            status_code=500,
-            error="Internal Server Error"
-        )
+
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @app.get("/sessions")
