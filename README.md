@@ -4,13 +4,6 @@ An AI-powered support assistant built using React.js, FastAPI, Gemini API, Chrom
 
 ## Features
 
-* Conversational AI chat interface
-* PDF upload and text extraction
-* Semantic search using embeddings
-* Retrieval-Augmented Generation (RAG)
-* Persistent chat history
-* Session management
-* Context-aware AI responses
 * AI-powered conversational chat
 * PDF upload and processing
 * Retrieval-Augmented Generation (RAG)
@@ -99,7 +92,6 @@ DATABASE_URL=postgresql://postgres:password@localhost:5432/ai_assistant
 
 #### 5. Add Database Setup
 
-```md
 ## PostgreSQL Setup
 
 1. Install PostgreSQL
@@ -107,6 +99,11 @@ DATABASE_URL=postgresql://postgres:password@localhost:5432/ai_assistant
 
 ```sql
 CREATE DATABASE ai_assistant;
+```
+
+3. Update your `.env` file with the correct database credentials.
+
+---
 
 ## Screenshots
 
